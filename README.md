@@ -1,9 +1,13 @@
 # DL-Project
-ECTF+VAE: A Hybrid EfficientNet–Token Transformer–VAE Ensemble for Fashion-MNIST Classification
+
+# ECTF+VAE: A Hybrid EfficientNet–Token Transformer–VAE Ensemble for Fashion-MNIST Classification
+
 Abstract
 This work presents a novel hybrid deep learning pipeline, called ECTF+VAE, for image classification on the Fashion-MNIST benchmark. The proposed approach combines (i) an EfficientNet-B0 convolutional backbone for local feature extraction, (ii) mid-level tokenization of feature maps followed by a compact Transformer encoder for modeling long-range dependencies, (iii) a token-level variational autoencoder (Token-VAE) that regularizes token representations via reconstruction and KL divergence, and (iv) an ensemble of two independently seeded models whose logits are averaged at inference time. Experimental results on Fashion-MNIST show that a single ECTF+VAE model reaches approximately 94.9% test accuracy, while a two-member ensemble attains 95.38% accuracy and a macro F1-score of 0.9537 after only six training epochs. Compared to a simple CNN baseline (~60% accuracy) and a pure EfficientNet-style backbone, the proposed pipeline yields substantial gains while remaining computationally moderate. We also compare our results with recent CNN and CNN–Transformer hybrids from the literature and highlight that ECTF+VAE offers a competitive accuracy–complexity trade-off and a clearly interpretable modular design that can be adapted to other small-scale classification problems.
+
 Keywords
 Fashion-MNIST, EfficientNet, Vision Transformer, Variational Autoencoder, Hybrid CNN–Transformer, Ensemble Learning
+
 1 Introduction
 Fashion-MNIST has become a widely used benchmark for evaluating image classification models that go beyond the original MNIST digit dataset. It consists of 60,000 training and 10,000 test grayscale images of size 28×28, covering ten clothing categories with moderate intra-class variation and inter-class similarity. Despite its apparent simplicity, Fashion-MNIST remains challenging for lightweight models, particularly when training time or model size is constrained.
 
@@ -20,6 +24,7 @@ This project focuses on designing and implementing a compact but conceptually ri
 •	• Employs an ensemble of two models to further boost accuracy.
 
 The remainder of this draft paper is organized as follows. Section 2 reviews recent related work on Fashion-MNIST and hybrid CNN–Transformer architectures. Section 3 describes the proposed ECTF+VAE methodology, including model design and training setup. Section 4 presents the experimental results and comparisons with prior work. Section 5 concludes and outlines potential extensions.
+
 2 Literature Survey
 This section summarizes at least ten recent or representative works related to Fashion-MNIST classification, hybrid CNN–Transformer models, and the use of VAEs in conjunction with Transformer-based vision models. These papers form the backdrop against which we position the proposed ECTF+VAE pipeline.
 1.	Mukhamediev et al. (2024): propose a carefully tuned CNN with three convolutional layers (CNN-3-128) and report state-of-the-art results on Fashion-MNIST, achieving up to 99.65% test accuracy. Their work shows that, with heavy architectural search and training, very high performance can be reached on this dataset, but at the cost of increased complexity and over-specialization to Fashion-MNIST.
@@ -34,11 +39,11 @@ This section summarizes at least ten recent or representative works related to F
 10.	Arshad et al. (2024): describe a hybrid convolution–Transformer network for hyperspectral image classification. The model uses a residual 3D CNN and a ViT-like module, achieving strong results and reinforcing the idea that CNN–Transformer hybrids generalize well across different imaging modalities.
 11.	Tanwar et al. (2025, EfficientViT review): also discuss design considerations for combining EfficientNet backbones with Transformer modules, including tokenization strategies and fusion mechanisms. Our work differs by focusing on mid-level tokenization plus a VAE regularizer in a compact setting for Fashion-MNIST.
 Across these works, several themes emerge: (i) Fashion-MNIST can be pushed above 99% with highly tuned CNN architectures, (ii) hybrid CNN–Transformer models are increasingly popular, and (iii) VAEs can complement Transformers by providing generative regularization. However, few works explicitly explore a lightweight EfficientNet-B0 + token Transformer + token-VAE pipeline on Fashion-MNIST with an emphasis on modularity and low training epochs. This gap motivates our approach.
+
 3 Proposed Methodology: ECTF+VAE Pipeline
 This section describes the architecture and training strategy implemented in the project code. The core idea is to build a modular pipeline that combines a pretrained EfficientNet-B0 backbone, a token-based Transformer encoder, a token-level VAE regularizer, and an ensemble inference strategy.
 3.1 Overall Architecture
 The proposed ECTF+VAE model consists of the following stages:
-
 •	Input preprocessing: Fashion-MNIST grayscale images (28×28) are resized to 128×128 and replicated across three channels to match the expected input of EfficientNet-B0. Standard normalization with mean 0.5 and standard deviation 0.5 is applied.
 •	EfficientNet-B0 backbone: A pretrained EfficientNet-B0 model from the timm library is used with features_only=True and out_indices=[4]. This returns a mid-level feature map f ∈ ℝ^{B×C×H×W} that contains rich spatial and semantic information.
 •	Token projection: A 1×1 convolution projects the C-channel feature map into D=TOKEN_DIM channels, producing t ∈ ℝ^{B×D×H×W}. This tensor is then reshaped into a sequence of T=H·W tokens of dimension D.
@@ -48,14 +53,11 @@ The proposed ECTF+VAE model consists of the following stages:
 •	Fusion and classifier: The mean-pooled Transformer token vector and the global CNN vector are concatenated to form a fused representation, which is fed to a small MLP classifier with GELU activation and dropout to output logits over the 10 Fashion-MNIST classes.
 3.2 Training Objective
 The total loss used to train ECTF+VAE is a weighted sum of three components:
-
 •	Cross-entropy loss L_ce between the predicted logits and the ground-truth class labels, with optional label smoothing (ε=0.1).
 •	Reconstruction loss L_rec, defined as the mean-squared error between the reconstructed token feature map from the VAE decoder and the original projected feature map.
 •	KL divergence L_kl between the approximate posterior q(z|tokens) and a unit Gaussian prior, averaged over the batch.
 The final objective is
-
     L_total = L_ce + λ · L_rec + β · L_kl
-
 where λ = 1.0 and β = 1e−3 in our experiments. This choice encourages the model to remain primarily discriminative while gently regularizing the token space through the VAE.
 3.3 Ensemble Strategy
 To further improve robustness and accuracy, we train two independent instances of the ECTF+VAE model with different random seeds. At inference time, the ensemble prediction for a given input is obtained by averaging the logits from both models and taking the argmax. This simple logit-averaging ensemble often yields better generalization than any single model.
@@ -77,6 +79,7 @@ Figure 1: Proposed ECTF+VAE Pipeline
    • MLP classifier → logits for 10 classes
 6. Losses:
    • Cross-entropy on logits + λ·MSE(reconstruction) + β·KL(z).
+
 4 Experimental Results and Analysis
 4.1 Experimental Setup
 All experiments are conducted on the Fashion-MNIST dataset with the standard train/test split (60,000/10,000). Images are resized to 128×128, normalized, and augmented with random horizontal flips and small rotations during training. Models are trained using the AdamW optimizer with learning rate 3×10−4, weight decay 1×10−4, batch size 192, and StepLR scheduling (decay by 0.5 every 3 epochs). Each ECTF+VAE model is trained for 6 epochs on a GPU. For the baseline SimpleCNN model, we use a small 3-layer convolutional network trained under similar conditions.
@@ -92,16 +95,17 @@ The SimpleCNN baseline reaches only about 60% test accuracy and macro F1, confir
 Several recent works report higher absolute accuracies on Fashion-MNIST, in some cases above 99%. For example, Mukhamediev et al. (2024) achieve 99.65% accuracy using a heavily tuned CNN architecture with three convolutional layers and extensive hyperparameter optimization. Such models are highly specialized for Fashion-MNIST and may involve a larger number of parameters or longer training schedules.
 
 In contrast, our ECTF+VAE pipeline is designed to be:
-
 •	Modular: It decomposes the problem into clear stages (CNN backbone, token Transformer, VAE regularizer, fusion, and classifier), making it easier to adapt or extend to other datasets.
 •	Hybrid and interpretable: By using mid-level tokenization and explicit fusion of CNN and Transformer features, the architecture makes it clear how local and global information interact.
 •	Lightweight in training time: We demonstrate strong performance (95.38% accuracy) with only 6 epochs and an ensemble of two models, which is practical for educational and prototyping settings.
 •	Methodologically novel: Unlike existing EfficientNet–Transformer hybrids that typically use patch-based tokenization and do not employ a VAE, our pipeline uses mid-level feature-map tokens and a token-VAE reconstruction objective to regularize the token space.
 Given these design goals, ECTF+VAE can be considered a novel and practically useful architecture in the space of hybrid CNN–Transformer models for small-scale vision benchmarks. It demonstrates how combining EfficientNet, Transformers, VAEs, and ensembling can lead to a robust yet conceptually clean pipeline.
+
 5 Conclusion and Future Work
 This draft presented the design, implementation, and evaluation of the ECTF+VAE pipeline for Fashion-MNIST classification. The method combines an EfficientNet-B0 backbone, mid-level tokenization with a Transformer encoder, a token-level VAE regularizer, and a simple two-member ensemble. Experiments show that the ensemble reaches 95.38% accuracy and 0.9537 macro F1, significantly outperforming a simple CNN baseline and improving over a pure ECTF model without VAE.
 
 Future work could explore: (i) more sophisticated fusion mechanisms (e.g., attention-based gating between CNN and Transformer features), (ii) multi-scale tokenization that uses features from several EfficientNet stages, (iii) extension to other datasets such as CIFAR-10 or medical image benchmarks, and (iv) deeper analysis of the learned token-VAE latent space for interpretability and anomaly detection.
+
 References
 [1] R. I. Mukhamediev et al., "State-of-the-Art Results with the Fashion-MNIST Dataset," Mathematics, 2024.
 [2] S. S. Kadam et al., "CNN Model for Image Classification on MNIST and Fashion-MNIST," 2020.
